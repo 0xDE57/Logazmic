@@ -1,27 +1,24 @@
-using System.Collections.Generic;
-using System.Globalization;
-using System.Threading.Tasks;
 using JetBrains.Annotations;
 using Logazmic.Core.Filters;
 using Logazmic.Core.Receiver;
 using Logazmic.Utils;
 using Logazmic.ViewModels.Events;
 using Logazmic.ViewModels.Filters;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Threading.Tasks;
 
 namespace Logazmic.ViewModels
 {
+    using Caliburn.Micro;
+    using Core.Log;
+    using Services;
     using System;
     using System.Collections.Specialized;
     using System.Linq;
     using System.Text;
     using System.Windows;
     using System.Windows.Data;
-
-    using Caliburn.Micro;
-    
-    using Core.Log;
-    using Services;
-    using Settings;
 
     public class LogPaneViewModel : UpdatableScreen, IHandle<RefreshEvent>, IDisposable
     {
@@ -179,9 +176,39 @@ namespace Logazmic.ViewModels
             try
             {
                 var sb = new StringBuilder();
-                foreach (var row in CollectionViewSource.View.OfType<LogMessage>())
+                int rowCount = 0;
+               
+                if (CollectionViewSource == null)
                 {
-                    sb.AppendLine(row.MessageSingleLine);
+                    DialogService.Current.ShowErrorMessageBox($"CollectionViewSource is null!");
+                    return;
+                }
+                if (CollectionViewSource.View == null)
+                {
+                    DialogService.Current.ShowErrorMessageBox($"CollectionViewSource.View is null!");
+                    return;
+                }
+
+                IEnumerable<LogMessage> rows = CollectionViewSource.View.OfType<LogMessage>();
+                if (rows == null)
+                {
+                    DialogService.Current.ShowErrorMessageBox($"rows is null!");
+                    return;
+                }
+                foreach (var row in rows)
+                {
+                    try
+                    {
+                        sb.AppendLine(row.MessageSingleLine);
+                    }
+                    catch (Exception ex)
+                    {
+                        DialogService.Current.ShowErrorMessageBox($"Failed to copy line {rowCount}\n{ex.Message}");
+                    }
+                    finally
+                    {
+                        rowCount++;
+                    }
                 }
                 Clipboard.SetDataObject(sb.ToString());
             }
