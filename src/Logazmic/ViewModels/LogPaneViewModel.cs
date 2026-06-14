@@ -7,6 +7,7 @@ using Logazmic.ViewModels.Filters;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
+using NLog;
 
 namespace Logazmic.ViewModels
 {
@@ -22,6 +23,7 @@ namespace Logazmic.ViewModels
 
     public class LogPaneViewModel : UpdatableScreen, IHandle<RefreshEvent>, IDisposable
     {
+        private static readonly Logger Logger = NLog.LogManager.GetCurrentClassLogger();
         private SourceFilterViewModel _selectedLogSource;
         private CollectionViewSource _collectionViewSource;
 
@@ -117,12 +119,35 @@ namespace Logazmic.ViewModels
         {
             get
             {
-                var format = "LogFormat: " + Receiver.LogFormat;
+                var receiverInfo = "LogFormat: " + Receiver.LogFormat;
                 if (string.IsNullOrEmpty(Receiver.Description))
                 {
-                    return format;
+                    string port = string.Empty;
+                    string type = string.Empty;
+                    string buffer = string.Empty;
+                    string ipv6 = string.Empty;
+                    switch (Receiver)
+                    {
+                        case TcpReceiver tcpReceiver:
+                            port = tcpReceiver.Port.ToString();
+                            type = "TCP";
+                            buffer = tcpReceiver.BufferSize.ToString();
+                            ipv6 = tcpReceiver.IpV6 ? "true" : "false";
+                            break;
+                        case UdpReceiver udpReceiver:
+                            port = udpReceiver.Port.ToString();
+                            type = "UDP";
+                            buffer = udpReceiver.BufferSize.ToString();
+                            ipv6 = udpReceiver.IpV6 ? "true" : "false";
+                            break;
+                    }
+                    receiverInfo += Environment.NewLine + "Port: " + port;
+                    receiverInfo += Environment.NewLine + "Type: " + type;
+                    receiverInfo += Environment.NewLine + "Buffer: " + buffer;
+                    receiverInfo += Environment.NewLine + "IpV6: " + ipv6;
+                    return receiverInfo;
                 }
-                return Receiver.Description + Environment.NewLine + format;
+                return Receiver.Description + Environment.NewLine + receiverInfo;
             }
         }
 
@@ -152,7 +177,7 @@ namespace Logazmic.ViewModels
         
         public async Task Rename()
         {
-            var newName = await DialogService.Current.ShowInputDialog("Rename", "Enter new name:");
+            var newName = await DialogService.Current.ShowInputDialog($"Rename: {DisplayName}", "Enter new name:");
             if (string.IsNullOrEmpty(newName))
             {
                 return;
@@ -214,22 +239,45 @@ namespace Logazmic.ViewModels
             }
             catch (Exception e)
             {
+                Logger.Error(e, "Failed to copy log entries to clipboard");
                 DialogService.Current.ShowErrorMessageBox(e);
             }
+        }
+
+        public string CurrentToText()
+        {
+            try
+            {
+                var sb = new StringBuilder();
+                foreach (var row in CollectionViewSource.View.OfType<LogMessage>())
+                {
+                    sb.AppendLine(row.MessageSingleLine);
+                }
+                return sb.ToString();
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to export log entries to text");
+                DialogService.Current.ShowErrorMessageBox(e);
+            }
+            return null;
         }
 
         public void Initialize()
         {
             try
             {
+                Logger.Info("Initializing receiver: {0} (Type={1})", Receiver.DisplayName, Receiver.GetType().Name);
                 Receiver.NewMessage += OnNewMessage;
                 Receiver.NewMessages += OnNewMessages;
                 Receiver.Initialize();
 
                 Update(true);
+                Logger.Info("Receiver initialized successfully: {0}", Receiver.DisplayName);
             }
             catch (Exception e)
             {
+                Logger.Error(e, "Failed to initialize receiver: {0}", Receiver.DisplayName);
                 DialogService.Current.ShowErrorMessageBox(e);
                 TryClose();
                 throw;
@@ -334,6 +382,7 @@ namespace Logazmic.ViewModels
 
         public void Dispose()
         {
+            Logger.Info("Disposing LogPane: {0}", Receiver?.DisplayName ?? "(null)");
             LogPaneServices.EventAggregator.Unsubscribe(this);
 
             _searchTextChangedSubscriber?.Dispose();
