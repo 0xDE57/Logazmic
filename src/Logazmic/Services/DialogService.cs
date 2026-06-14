@@ -29,7 +29,7 @@ namespace Logazmic.Services
 
         public void ShowErrorMessageBox(Exception e)
         {
-           ShowErrorMessageBox(e.Message);
+           ShowErrorMessageBox(e.Message + "\n\n" + e.StackTrace);
         }
 
         public void ShowErrorMessageBox(string message)
