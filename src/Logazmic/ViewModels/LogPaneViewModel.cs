@@ -4,10 +4,10 @@ using Logazmic.Core.Receiver;
 using Logazmic.Utils;
 using Logazmic.ViewModels.Events;
 using Logazmic.ViewModels.Filters;
+using NLog;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
-using NLog;
 
 namespace Logazmic.ViewModels
 {
